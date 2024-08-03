@@ -1,0 +1,87 @@
+---
+output: 
+  pdf_document:
+    extra_dependencies: ['multicol','graphicx','color']
+    includes:
+        in_header: 1_latex_style.sty
+---
+
+```{r, echo=FALSE}
+code = those_to_mail$code[k]
+name = str_replace_all(those_to_mail$name[k], '&', 'and')
+name = str_remove_all(name, '\\#')
+name = str_squish(name)
+organisation = str_replace_all(those_to_mail$organisation[k], '&', 'and')
+Addr <- str_replace_all(those_to_mail$postal_address[k], '&', 'and')
+```
+
+```{=latex}
+
+	\begin{multicols}{2}
+	
+	\includegraphics[height=1.5cm,width=5.0cm,angle=0]{QUTlogo.eps}
+
+\begin{scriptsize}
+		\begin{tabular}{p{1.52cm}r}
+			&  {\color{blue}Professor Adrian Barnett}\\
+			&  {\color{blue}\textbf{Queensland University of Technology}}\\
+			&{\color{blue}60 Musk Ave}\\
+			&{\color{blue}Kelvin Grove Qld 4059 Australia}\\
+			&{\color{blue}Phone +61 7 3138 6010}\\
+			&{\color{blue}Email: a.barnett@qut.edu.au}\\
+		\end{tabular}
+	\end{scriptsize}
+
+\end{multicols}
+
+\vspace{10mm}
+
+```
+
+```{=latex}
+\begin{flushright}
+ 
+ `r format(today, '%d %b %Y')`
+
+\end{flushright}
+```
+
+**Statisticians on Human Research Ethics Committees**
+
+```{=latex}
+\vspace{5mm}
+
+`r name`
+
+`r organisation`
+
+`r Addr`  
+
+\vspace{5mm}
+```
+
+Dear Human Research Ethics Committee
+
+I am Professor Adrian Barnett from the Queensland University of Technology (QUT). My colleagues and I are conducting research to examine the prevalence of statisticians on Human Research Ethics Committees in Australia.  Our aim is to understand how many Australian committees have access to statistical advice.
+
+We have written to you as we believe that you are a current chair of the `r name` HREC (`r code`). We emailed a survey to you four weeks ago but have yet to receive your reply. If you do not wish to take part then simply ignore this letter as this is the last time we will contact you.
+
+Details on the study and how to participate can be found by copying this link into a web browser: 
+
+`r short_url`
+
+The link will take you to an online survey, but you can respond by telephone if you would prefer (07 3138 6010). This link is specific to you, so please do not pass it on to others.
+
+If you are interested in participating or have any questions, please contact me via email or phone. 
+
+This study has been approved by the QUT Human Research Ethics Committee (approval number LR 2024-8420-18539).
+
+Yours sincerely,
+
+```{=latex}
+\vspace{10mm}
+
+\includegraphics[height=2cm,width=5cm,angle=0]{AGB.eps}
+```
+
+Professor Adrian Barnett

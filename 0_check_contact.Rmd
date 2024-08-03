@@ -1,0 +1,22 @@
+---
+title: "Check HREC contact information"
+author: "Adrian Barnett"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, error = FALSE, comment='', dpi=400)
+library(flextable)
+```
+
+## No generic email or chair email
+
+```{r}
+tab = filter(hrecs, is.na(generic_email), is.na(email)) %>%
+  select(name, notes)
+ftab = flextable(tab) %>%
+  theme_box() %>%
+  width(j=1:2, width=3, unit = 'in')
+ftab
+```
