@@ -1,7 +1,18 @@
 # Do ethics committees include statisticians? A census of Australian health and medical committees
 
-R code to run the national census of human research ethics committees in Australia to ascertain if they have access to a qualified statistician.
+R code to run a national census of human research ethics committees in Australia to ascertain if they have access to a qualified statistician.
 
+The files are in order
+
+- 0_ reads the sampling frame
+
+- 1_ prepares the letters to HRECs
+
+- 2_ reads the online survey data from *Qualtrics*
+
+- 3_ removes any personal information from the data
+
+- 4_ creates the reports and figures
 
 ### R version
 
