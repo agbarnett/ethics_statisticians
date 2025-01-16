@@ -1,0 +1,27 @@
+names	labels
+status	Response Type
+progress	Progress
+duration_in_seconds	Duration (in seconds)
+finished	Finished
+recorded_date	Recorded Date
+q3	What is your current role(s) on the committee? 
+q4	How many full members are on the current committee including the chair?
+q6_1_1	Option 1: How many applications did the committee consider in 2023 that included quantitative data and/or analysis?
+q6_1_2	Option 1: How many applications did the committee consider in 2023 that included quantitative data and/or analysis?
+q6_1_3	Option 1: How many applications did the committee consider in 2023 that included quantitative data and/or analysis?
+q7	Option 2 part a: How many applications did the committee consider in 2023?
+q8_1_1	Option 2 part b: What percentage of these applications included quantitative data and/or analysis? Give your best estimate, and a lower and upper range if you are uncertain. - Percentage of applications with quantitative data and/or analysis - Best estimate
+q8_1_2	Option 2 part b: What percentage of these applications included quantitative data and/or analysis? Give your best estimate, and a lower and upper range if you are uncertain. - Percentage of applications with quantitative data and/or analysis - Lower range (optional)
+q8_1_3	Option 2 part b: What percentage of these applications included quantitative data and/or analysis? Give your best estimate, and a lower and upper range if you are uncertain. - Percentage of applications with quantitative data and/or analysis - Upper range (optional)
+q9_1	Is there currently a qualified statistician: - As a full member of the committee?
+q9_2	Is there currently a qualified statistician: - As a non-member but who can be consulted on statistical issues?
+q10	What are the statistician’s qualifications in statistics?
+q11	Are they currently employed as a statistician? 
+q12	How do you decide when to consult the statistician? 
+q13	When did your committee last have a statistician as a full member?
+q14	How are statistical aspects of studies dealt with? 
+q15	Why don't you have a statistician on the committee?
+q16	Do you consider that the committee needs a statistician as a full member?
+q18	Does this change in wording alter your opinion about having a qualified statistician member of the committee?
+q21	The statistician's concerns are discussed amongst the committee
+q22	The application is sent back to the researchers and they are asked to address the statistician's concerns

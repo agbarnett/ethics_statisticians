@@ -1,12 +1,13 @@
 # 4_export_comments.R
 # export the comments for analysis by Taya
-# July 2024
+# August 2024
 library(dplyr)
 library(openxlsx)
 library(stringr)
+source('99_functions.R')
 
-# from 3_blind_comments_do_not_share.R
-load('data/3_HREC_Responses.RData')
+# get data from 2_read_qualtrics_api.R, can give unblinded comments to Taya
+load('data/2_HREC_Responses.RData')
 
 ## Fix short labels for q17 and q19
 labels = mutate(labels,
@@ -18,11 +19,7 @@ labels = mutate(labels,
 # list the comment questions to export to Excel
 questions_to_export = c('q10_9_text', 'q11_9_text','q12_4_text','q14_6_text','q15_5_text','q17','q19','q24','q25')
 
-# function to remove very short comments
-remove_short = function(x){
-  x = str_remove(x, '^(n|N)o.?$|^(n|N)il.?$')
-  x
-}
+
 
 ## export to excel
 header_style <- createStyle(fontColour = "#ffffff", fgFill = "#4F80BD", halign = "left",

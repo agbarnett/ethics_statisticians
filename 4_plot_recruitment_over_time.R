@@ -45,5 +45,9 @@ gplot = ggplot(data=to_plot, aes(x=recorded_date, y=csum)) +
 jpeg('figures/4_recruitment.jpg', width=5, height=4, units='in', res=500, quality = 100)
 print(gplot)
 dev.off()
+# EPS version
+postscript('figures/4_recruitment.eps', width=5, height=4)
+print(gplot)
+dev.off()
 
 

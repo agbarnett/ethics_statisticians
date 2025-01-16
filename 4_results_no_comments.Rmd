@@ -16,8 +16,10 @@ library(dplyr)
 options(dplyr.summarise.inform = FALSE)
 library(janitor) # for tabyl
 library(flextable)
+library(xtable) # for latex
 library(EnvStats) # for triangular distribution
 source('99_functions.R')
+TeachingDemos::char2seed('Lincoln')
 
 # graphics set up
 library(ggplot2)
@@ -40,7 +42,7 @@ load('data/0_hrecs.RData')
 
 # Broken and incorrect links
 
-There were hyper links in the sampling frame that did were broken or did not resolve to HREC's web page.
+There were many hyper links in the sampling frame that were broken or did not resolve to HREC's web page.
 
 ```{r}
 tab = tabyl(hrecs, nhmrc_link_resolve) %>%
@@ -58,6 +60,7 @@ ftab
 # CONSORT flow chart
 
 ```{r}
+source('4_consort_flow.R')
 knitr::include_graphics(path='figures/4_consort_flow.jpg')
 ```
 
@@ -80,10 +83,9 @@ last = format(last, '%d %b %Y')
 
 The total number recruited is `r nrow(data)`. The first participant was recruited on `r first` and the last on `r last`, which is `r days_recruit` days.
 
-There were `r n_non_consent` respondents who did not consent to participate.
+There were `r n_non_consent` respondents who did not consent to participate according to the yes/no consent question in the form.
 
 The total number of questionnaires sent was `r n_sent` so the response rate is `r round(100*nrow(data)/n_sent)`%.
-
 
 
 # Meta-data on questions
@@ -104,6 +106,7 @@ ftab = flextable(stats) %>%
 ftab
 ```
 
+These results are only for those who answered some of the questions and exclude the "click through" respondents. 
 The summary statistics show the time in minutes to complete the online questions. Q[x] is the *x*th percentile.
 
 The very long times are almost certainly due to respondents leaving the browser window open and returning to complete the questionnaire. This is possibly because they had to gather further information. 
@@ -127,7 +130,7 @@ finished = sum(data$progress==100)
 finished_p = round(100*finished / nrow(data))
 ```
 
-All respondents completed most of the questions. The number and percent who finished all the questions was `r finished` (`r finished_p`%).
+Most respondents completed most of the questions. 
 
 # Questions
 
@@ -146,19 +149,8 @@ ftab = flextable(tab) %>%
 ftab
 ```
 
-#### List of other roles given
+The percent for "No answer" is for all participants who could have answered the question. The other percents use a denominator of respondents who gave at least one answer.
 
-```{r, results='asis'}
-others = select(data, id, q3_5_text) %>%
-  rename('text' = 'q3_5_text') %>%
-  filter(!is.na(text)) %>%
-  mutate(text = str_replace_all(text, '\n', ' '))
-for (k in 1:nrow(others)){
-  cat('* [', others$id[k], '] ', others$text[k], '\n', sep='')
-}
-```
-
-There were `r nrow(others)` other roles. We give the survey ID number so that results can be compared with other comments.
 
 ### How many full members are on the current committee including the chair?
 
@@ -175,7 +167,7 @@ ftab = flextable(tab) %>%
 ftab
 ```
 
-The summary statistics show the median and first to third quartile. `n` is the number answered.
+The summary statistics above are the median and first to third quartile. `n` is the number answered.
 
 #### Barplot of committee size
 
@@ -235,7 +227,28 @@ tab = flextable(outside) %>%
 tab
 ```
 
-The above table is a check that respondents understood the purpose of the lower and upper range.
+The above table is a check that respondents understood the purpose of the lower and upper range. As there are no rows in the table, it appears that respondents understood the question. 
+
+### How many respondents included some uncertainty for option 1
+
+```{r}
+# categorise uncertainty as some response to lower or upper interval that is not equal to mean
+some_uncertainty = select(data, id, starts_with('q6_1_')) %>%
+  filter(!is.na(q6_1_1)) %>% # mean must be there
+  mutate(uncertainty = case_when(
+    !is.na(q6_1_2)& q6_1_2!=q6_1_1 ~ 'Yes',
+    !is.na(q6_1_3)& q6_1_3!=q6_1_1 ~ 'Yes',
+    TRUE ~ 'No'
+  ))
+#
+tab =  tabyl(some_uncertainty, uncertainty) %>%
+  mutate(percent = round(percent*100)) 
+names(tab)[1] = 'Some uncertainty'
+ftab = flextable(tab) %>%
+  theme_box() %>%
+  autofit()
+ftab
+```
 
 ### Option 2 part a: How many applications did the committee consider in 2023?
 
@@ -292,58 +305,39 @@ tab
 
 The above table is a check that respondents understood the purpose of the lower and upper range.
 
+### How many respondents included some uncertainty for option 2
+
+```{r}
+# categorise uncertainty as some response to lower or upper interval that is not equal to mean
+some_uncertainty = select(data, id, starts_with('q8_1_')) %>%
+  filter(!is.na(q8_1_1)) %>% # mean must be there
+  mutate(uncertainty = case_when(
+    !is.na(q8_1_2)& q8_1_2!=q8_1_1 ~ 'Yes',
+    !is.na(q8_1_3)& q8_1_3!=q8_1_1 ~ 'Yes',
+    TRUE ~ 'No'
+  ))
+#
+tab =  tabyl(some_uncertainty, uncertainty) %>%
+  mutate(percent = round(percent*100)) 
+names(tab)[1] = 'Some uncertainty'
+ftab = flextable(tab) %>%
+  theme_box() %>%
+  autofit()
+ftab
+```
+
+
 ### Total number of applications
 
-We combined the results from options 1 and 2 to give an overall estimate of the total number of applications and the uncertainty. We also impute the results for HRECs who did not respond to give a national estimate.
+We combined the results from options 1 and 2 to give an overall estimate of the total number of applications and the uncertainty. We imputed the results for HRECs who did not respond to give a national estimate.
 
 ```{r total_imputation}
-TeachingDemos::char2seed('everton')
-n_boot = 1000
-n_complete = filter(data, !is.na(q6_1_1) | (!is.na(q7) & !is.na(q8_1_1))) %>% nrow() # number who completed one option
-n_missing = n_sent - n_complete # number of missing HRECs
-# 
-boot_samples = NULL
-data$q6_1_1[1] = NA # TEMPORARY, one set to missing else code will not work
-for (k in 1:n_boot){
-sample1 = filter(data, !is.na(q6_1_1)) %>% # completed first option
-  select(id, starts_with('q6_1')) %>%
-  mutate(
-    q6_1_2 = ifelse(is.na(q6_1_2), q6_1_1, q6_1_2), # set to mean if no uncertainty
-    q6_1_3 = ifelse(is.na(q6_1_3), q6_1_1, q6_1_3), # set to mean if no uncertainty
-    q6_1_2 = ifelse(q6_1_2 > q6_1_1, q6_1_1, q6_1_2), # set to mean if outside
-    q6_1_3 = ifelse(q6_1_3 < q6_1_1, q6_1_1, q6_1_3), # set to mean if outside
-    q6_1_2 = ifelse(q6_1_2 == q6_1_1, q6_1_1-0.1, q6_1_2), # add negligible amount of variance for triangular distribution
-    q6_1_3 = ifelse(q6_1_3 == q6_1_1, q6_1_1+0.1, q6_1_3), # add negligible amount of variance for triangular distribution
-    r = round(rtri(n=n(), min = q6_1_2, max = q6_1_3, mode = q6_1_1))) 
-sample2 = filter(data, is.na(q6_1_1), !is.na(q7), !is.na(q8_1_1)) %>% # completed second option
-  select(id, q7, starts_with('q8_1')) %>%
-  mutate(
-    q8_1_2 = ifelse(is.na(q8_1_2), q8_1_1, q8_1_2), # set to mean if no uncertainty
-    q8_1_3 = ifelse(is.na(q8_1_3), q8_1_1, q8_1_3), # set to mean if no uncertainty
-    q8_1_2 = ifelse(q8_1_2 > q8_1_1, q8_1_1, q8_1_2), # set to mean if outside
-    q8_1_3 = ifelse(q8_1_3 < q8_1_1, q8_1_1, q8_1_3), # set to mean if outside
-    q8_1_2 = ifelse(q8_1_2 == q8_1_1, q8_1_1-0.1, q8_1_2), # add negligible amount of variance for triangular distribution
-    q8_1_3 = ifelse(q8_1_3 == q8_1_1, q8_1_1+0.1, q8_1_3), # add negligible amount of variance for triangular distribution
-    p = round(rtri(n=n(), min = q8_1_2, max = q8_1_3, mode = q8_1_1)),
-    r = round((p/100)*q7)) # percent times application numbers
-# combine samples
-sample = bind_rows(sample1, sample2)
-# impute missing HRECs
-imputed = data.frame(id = 999 + 1:n_missing,
-                     r = sample(sample$r, size = n_missing, replace = TRUE))
-# get overall total
-total = bind_rows(sample, imputed) %>% 
-  summarise(n=n(), total = sum(r)) %>%
-  mutate(k = k)
-#
- boot_samples = bind_rows(boot_samples, total)
-}
-# check
-if(any(boot_samples$n != n_sent)){cat('Error in numbers\n')}
+source('4_total_numbers.R')
+
 # histogram
 hplot = ggplot(data = boot_samples, aes(x=total)) + 
   geom_histogram(fill='darkseagreen3', col='grey88')+
-  xlab('Total number of applications')+
+  xlab('Total number of applications with quantitative data')+
   ylab('Count')+
   g.theme
 hplot
@@ -357,32 +351,83 @@ We estimated the number of annual applications with quantitative data and/or ana
 
 The mean number of applications is `r format(b_mean, big.mark=',')` with a 95% confidence interval from `r format(b_lower, big.mark=',')` to `r format(b_upper, big.mark=',')`.
 
-### Does the committee currently have a qualified statistician
+### Does the committee currently have a statistician
 
 ```{r}
-# get two related questions
-for_tab = select(data, id, starts_with('q9_')) %>%
-  pivot_longer(-id) 
-numerator = group_by(for_tab, name, value) %>%
-  tally() %>%
-  rename('r' = 'n')
-denominator = group_by(for_tab, name) %>%
-  tally()
-tab = left_join(numerator, denominator, by='name') %>%
-  mutate(name = nice_rename(name),
+# make bootstrap confidence intervals that adjust for non-response, see 99_functions
+non_response = 187 - 93 # 187 sent email and 93 provided an answer
+two_questions = select(data, id, starts_with('q9_'))
+tab = bootstrap_intervals(indata = two_questions, non_response = non_response, n_boot = 10000) 
+# neaten the table
+neat_tab = mutate(tab,
+         name = nice_rename(name),
          percent = round(100*r/n),
-         cell = paste(r, ' (', percent, '%)', sep='')) %>%
-    select(name, value, cell) %>%
+         lower = round(lower),
+         upper = round(upper),
+         cell = paste(r, ' (', percent, '%)', sep=''),
+         interval = paste(lower, ' to ', upper, sep='')) %>%
+    select(name, value, cell, interval) %>%
     rename(
       'Question' = 'name',
       'Response' = 'value',
-      'n (%)' = 'cell')
-ftab = flextable(tab) %>%
+      'n (%)' = 'cell',
+      '95% CI' = 'interval')
+ftab = flextable(neat_tab) %>%
+  theme_box() %>%
+  merge_v(j = 1) %>%
+  autofit()
+ftab
+# export to latex
+print(xtable(neat_tab, caption = 'Does the committee currently have a qualified statistician', label='tab:main'), 
+      include.rownames=FALSE, 
+      math.style.negative=TRUE, 
+      table.placement = '!h',
+      file='latex/table_have_statistician.tex')
+```
+
+The above table shows the frequencies of the two key questions on statisticians. The empty responses are missing.
+
+We used bootstrap confidence intervals to estimate the percentages accounting for non-response using 10,000 bootstrap resamples.
+
+The main outcome is the number and percentage of statisticians who are full committee members.
+
+### Accounting for statistical qualifications
+
+```{r}
+# calculate bootstrap intervals
+two_questions = select(data, id, starts_with('adequate')) %>%
+  mutate(adequate1 = ifelse(adequate1 == 'Unknown', NA, adequate1), # change back to missing for function
+         adequate2 = ifelse(adequate2 == 'Unknown', NA, adequate2))
+tab = bootstrap_intervals(indata = two_questions, 
+                          non_response = non_response, 
+                          n_boot = 10000,
+                          v1 = 'adequate1',
+                          v2 = 'adequate2') 
+# neaten the table
+neat_tab = mutate(tab,
+         name = nice_rename(name),
+         percent = round(100*r/n),
+         lower = round(lower),
+         upper = round(upper),
+         cell = paste(r, ' (', percent, '%)', sep=''),
+         interval = paste(lower, ' to ', upper, sep='')) %>%
+    select(name, value, cell, interval) %>%
+    rename(
+      'Question' = 'name',
+      'Response' = 'value',
+      'n (%)' = 'cell',
+      '95% CI' = 'interval')
+ftab = flextable(neat_tab) %>%
   theme_box() %>%
   merge_v(j = 1) %>%
   autofit()
 ftab
 ```
+
+This table is as per the previous table but after accounting for where the respondents provided the statistician's qualifications. So to be classed as "Yes" the respondents had to respond "Yes" to the question and also provide some statistical qualifications. 
+
+Our secondary outcome is access to statistical expertise (either as a full member or non-member) from a qualified statistician.
+
 
 ### What are the statistician’s qualifications in statistics?
 
@@ -401,19 +446,8 @@ ftab = flextable(tab) %>%
 ftab
 ```
 
-##### Others
+The percent for "No answer" is for all participants who could have answered the question. The other percents use a denominator of respondents who gave at least one answer.
 
-We give the survey ID number so that results can be compared with other comments.
-
-```{r, results='asis'}
-others = select(data, id, q10_9_text) %>%
-  rename('text' = 'q10_9_text') %>%
-  filter(!is.na(text)) %>%
-  mutate(text = str_replace_all(text, '\n', ' '))
-for (k in 1:nrow(others)){
-  cat('* [', others$id[k], '] ', others$text[k], '\n', sep='')
-}
-```
 
 ### Are they currently employed as a statistician?
 
@@ -428,21 +462,6 @@ ftab = flextable(tab) %>%
   theme_box() %>%
   autofit()
 ftab
-```
-
-
-##### Other text
-
-We give the survey ID number so that results can be compared with other comments.
-
-```{r, results='asis'}
-others = select(data, id, q11_9_text) %>%
-  rename('text' = 'q11_9_text') %>%
-  filter(!is.na(text)) %>%
-  mutate(text = str_replace_all(text, '\n', ' '))
-for (k in 1:nrow(others)){
-  cat('* [', others$id[k], '] ', others$text[k], '\n', sep='')
-}
 ```
 
 ### How do you decide when to consult the statistician? 
@@ -465,19 +484,6 @@ ftab = flextable(tab) %>%
 ftab
 ```
 
-##### Other text
-
-We give the survey ID number so that results can be compared with other comments.
-
-```{r, results='asis'}
-others = select(data, id, q12_4_text) %>%
-  rename('text' = 'q12_4_text') %>%
-  filter(!is.na(text)) %>%
-  mutate(text = str_replace_all(text, '\n', ' '))
-for (k in 1:nrow(others)){
-  cat('* [', others$id[k], '] ', others$text[k], '\n', sep='')
-}
-```
 
 
 ### When did your committee last have a statistician as a full member?
@@ -494,6 +500,9 @@ ftab = flextable(tab) %>%
   theme_box() %>%
   autofit()
 ftab
+print(xtable(tab, caption = 'When did your committee last have a statistician as a full member?', label='tab:no_statistician'),       include.rownames = FALSE, 
+      table.placement = '!h',
+      file='latex/table_when_did.tex')
 ```
 
 
@@ -509,25 +518,16 @@ tab =  filter(data, q9_1 == 'No') %>% # only those who could answer question
   rename('Response' = 'q14')
 ftab = flextable(tab) %>%
   theme_box() %>%
-  autofit()
+  autofit() %>%
+  width(j=1, width=9.5, unit='cm')
 ftab
+# output to latex
+print(xtable(tab, caption = 'How are statistical aspects of studies dealt with?', label='tab:no_statistician'), 
+      include.rownames = FALSE, 
+      table.placement = '!h',
+      file='latex/table_how_are.tex')
 ```
 
-#### List of other ways statistical aspects are dealt with
-
-We give the survey ID number so that results can be compared with other comments.
-
-```{r, results='asis'}
-others = select(data, id, q14_6_text) %>%
-  rename('text' = 'q14_6_text') %>%
-  filter(!is.na(text)) %>%
-  mutate(text = str_replace_all(text, '\n', ' '))
-for (k in 1:nrow(others)){
-  cat('* [', others$id[k], '] ', others$text[k], '\n', sep='')
-}
-```
-
-There were `r nrow(others)` comments.
 
 ### Why don't you have a statistician on the committee? 
 
@@ -544,23 +544,12 @@ ftab = flextable(tab) %>%
   theme_box() %>%
   autofit()
 ftab
+# output to latex
+print(xtable(tab, caption = "Why don`t you have a statistician on the committee?", label='tab:no_statistician'), 
+      include.rownames = FALSE, 
+      table.placement = '!h',
+      file='latex/table_why_not.tex')
 ```
-
-#### List of other reasons
-
-We give the survey ID number so that results can be compared with other comments.
-
-```{r, results='asis'}
-others = select(data, id, q15_5_text) %>%
-  rename('text' = 'q15_5_text') %>%
-  filter(!is.na(text)) %>%
-  mutate(text = str_replace_all(text, '\n', ' '))
-for (k in 1:nrow(others)){
-  cat('* [', others$id[k], '] ', others$text[k], '\n', sep='')
-}
-```
-
-There were `r nrow(others)` reasons.
 
 ### Do you consider that the committee needs a statistician as a full member? 
 
@@ -577,25 +566,13 @@ ftab = flextable(tab) %>%
   theme_box() %>%
   autofit()
 ftab
+# output to latex
+print(xtable(tab, caption = "Do you consider that the committee needs a statistician as a full member?", label='tab:no_statistician'), 
+      include.rownames = FALSE, 
+      table.placement = '!h',
+      file='latex/table_you_consider.tex')
 ```
 
-
-### Do you have any comments in relation to the above questions?
-
-Only for respondents who answered that they do not have a statistician on the committee. We give the survey ID number so that results can be compared with other comments.
-
-```{r, results='asis'}
-others = filter(data, q9_1 == 'No') %>% # only those who could answer question
-  select(id, q17) %>%
-  rename('text' = 'q17') %>%
-  filter(!is.na(text)) %>%
-  mutate(text = str_replace_all(text, '\n', ' '))
-for (k in 1:nrow(others)){
-  cat('* [', others$id[k], '] ', others$text[k], '\n', sep='')
-}
-```
-
-There were `r nrow(others)` comments.
 
 ### National Statement wording
 
@@ -616,21 +593,6 @@ ftab
 ```
 
 
-##### Please explain why or why not
-
-We give the survey ID number so that results can be compared with other comments.
-
-```{r, results='asis'}
-others = filter(data, q16 == 'No') %>% # only those who could answer question
-  select(id, q19) %>%
-  rename('text' = 'q19') %>%
-  filter(!is.na(text)) %>%
-  mutate(text = str_replace_all(text, '\n', ' '))
-for (k in 1:nrow(others)){
-  cat('* [', others$id[k], '] ', others$text[k], '\n', sep='')
-}
-```
-
 ## How are statistical concerns handled?
 
 Question wording: ``Consider a hypothetical application. If the statistician advised the committee that the proposed method of data collection and/or analysis were not appropriate to answer the research question(s) then what actions are taken.''
@@ -638,115 +600,158 @@ Question wording: ``Consider a hypothetical application. If the statistician adv
 #### The statistician's concerns are discussed amongst the committee
 
 ```{r how_handled1}
-tab = filter(data, q9_1 == 'Yes' | q9_2 == 'Yes') %>% # only those who have a statistician
+tab1 = filter(data, q9_1 == 'Yes' | q9_2 == 'Yes') %>% # only those who have a statistician
   tabyl(q21) %>%
   mutate(percent = round(percent*100)) %>%
   filter(n > 0) %>%
   rename('Response' = 'q21')
-ftab = flextable(tab) %>%
+ftab = flextable(tab1) %>%
   theme_box() %>%
   autofit()
 ftab
 ```
 
-#### The statistician's concerns are discussed amongst the committee
+#### The application is sent back to the researchers and they are asked to address the statistician's concerns
 
 ```{r how_handled2}
-tab = filter(data, q9_1 == 'Yes' | q9_2 == 'Yes') %>% # only those who have a statistician
+tab2 = filter(data, q9_1 == 'Yes' | q9_2 == 'Yes') %>% # only those who have a statistician
   tabyl(q22) %>%
   mutate(percent = round(percent*100)) %>%
   filter(n > 0) %>%
   rename('Response' = 'q22')
-ftab = flextable(tab) %>%
+ftab = flextable(tab2) %>%
   theme_box() %>%
   autofit()
 ftab
 ```
 
-## Optional comments
 
-### Do you have any comments on the role of statisticians on Human Research Ethics Committees? 
+#### Summary plot
 
-We give the survey ID number so that results can be compared with other comments.
-
-```{r, results='asis'}
-others = select(data, id, q24) %>%
-  rename('text' = 'q24') %>%
-  filter(!is.na(text), 
-         !str_detect(tolower(text), '^no.?$|^nil.?$')) %>%
-  mutate(text = str_replace_all(text, '\n', ' '))
-for (k in 1:nrow(others)){
-  cat('* [', others$id[k], '] ', others$text[k], '\n', sep='')
-}
+```{r, fig.width=7}
+# combine tables and fix missing
+to_plot = bind_rows(tab1, tab2, .id = 'question') %>%
+  mutate(question = case_when(
+    question == 1 ~ "The statistician’s concerns are discussed amongst the committee",
+    question == 2 ~ "The application is sent back to the researchers and they are asked to address the statistician's concerns"
+  )) %>%
+  mutate(Response = ifelse(is.na(Response), 'Missing', Response))
+# labels and colours
+xlabels =  c("Always","Usually","Sometimes","Rarely","Never","Missing")
+colours = c(RColorBrewer::brewer.pal(name='Blues', n=5), 'grey77')
+#
+bplot = ggplot(data = to_plot, aes(fill = Response, x = question, y = n))+
+  geom_bar(stat = 'identity')+
+  scale_x_discrete(expand=c(0.01,0.01), labels = function(x) lapply(strwrap(x, width = 20, simplify = FALSE), paste, collapse="\n"))+
+  scale_y_continuous(expand=c(0,NA))+ # reduce gaps to axis
+  xlab('')+
+  ylab('Frequency')+
+  coord_flip()+
+  scale_fill_manual(name = NULL, values = colours, labels=xlabels)+
+  g.theme
+bplot
+# make latex table for paper
+for_latex = full_join(tab1, tab2, by='Response') %>%
+  mutate(cell1 = paste(n.x, ' (', percent.x, '%)', sep=''), # make percent and number cell
+         cell2 = paste(n.y, ' (', percent.y, '%)', sep='')) %>%
+  select('Response', 'cell1', 'cell2')
+# export to latex - transposed
+print(xtable(t(for_latex), caption = 'Summary table of how statistical issues are dealt with', label='tab:with_statistician'), 
+      include.rownames=FALSE, 
+      math.style.negative=TRUE, 
+      table.placement = '!h',
+      file='latex/table_statistical_issues.tex')
 ```
 
-There were `r nrow(others)` comments.
 
-### Do you have any comments on our questions?
+## Committees with access to a statistician
 
-We give the survey ID number so that results can be compared with other comments.
+Here we estimate the number and percentage of committees that have access to a qualified statistician. 
+This is those committees with a statistician as a member, or where there is a statistician as a non-member who can be consulted. For both cases, we verified that the statistician had qualifications in statistics. The unknown response is where these questions were not answered.
 
-```{r, results='asis'}
-others = select(data, id, q25) %>%
-  rename('text' = 'q25') %>%
-  filter(!is.na(text), 
-         !str_detect(tolower(text), '^no.?$|^nil.?$')) %>%
-  mutate(text = str_replace_all(text, '\n', ' '))
-for (k in 1:nrow(others)){
-  cat('* [', others$id[k], '] ', others$text[k], '\n', sep='')
-}
+```{r}
+tab = tabyl(data, any_adequate) %>%
+  mutate(percent = round(percent*100))
+names(tab)[1] = 'Access to statistician'
+ftab = flextable(tab) %>%
+  theme_box() %>%
+  colformat_double(j=3, digits=0) %>%
+  autofit()
+ftab
 ```
 
-There were `r nrow(others)` comments.
+### Estimated national application numbers by access to statistician
+
+Here we stratify the estimated total number of applications according to whether the committee has access to a statistician. We only use applications that included quantitative data. We include the uncertainty due to: the ranges provided by the respondents, the results from committees that did not respond. The estimates are national annual totals and are the mean and a 90% bootstrap interval.
+
+```{r}
+# boot_samples_by data is from 4_total_numbers.R
+# estimate mean and bootstrap interval
+stats = group_by(boot_samples_by, any_adequate) %>%
+  summarise(mean = round(mean(total)),
+            lower = round(quantile(total, 0.05)), # 90% CI
+            upper = round(quantile(total, 0.95))) %>%
+  ungroup()
+
+#
+bplot = ggplot(data = stats, aes(x=factor(any_adequate), label = mean, y=mean, ymin=lower, ymax=upper, col=factor(any_adequate)))+
+  xlab('')+
+  ylab('National application numbers')+
+  geom_point(size=5)+
+  geom_errorbar(width=0, linewidth=1.2)+
+  g.theme+
+  coord_flip()+
+  theme(legend.position = 'none')+
+  scale_color_manual('Access to qualified\nstatistician', values = c("indianred4", "green3", "orange3"))
+bplot
+# export
+ggsave(bplot, filename='figures/4_numbers.jpg', width=5, height=3, units='in', dpi=500)
+
+# alternative version for slide with numbers at mean
+bplotl = bplot + 
+  theme(axis.text = element_text(size=16), axis.title = element_text(size=14))+ # make text bigger
+  geom_text(vjust=-1) # add number labels
+# export
+ggsave(bplotl, filename='figures/4_numbers_plus.jpg', width=5.5, height=3, units='in', dpi=500)
+```
+
+##### Table of the plotted data
+
+```{r}
+ftab = mutate(stats, 
+               mean = round(mean),
+               lower = round(lower),
+               upper = round(upper)) %>%
+  flextable() %>%
+  autofit()
+ftab
+```
+
+Results show the mean and lower and upper limit from the bootstrap confidence interval.
 
 # Item-missing data
 
-The plots below show item-missing data with panels that match the questionnaire logic. This avoids data being wrongly flagged as missing when the respondent never saw that question. 
+The table below show item-missing data with panels that match the questionnaire logic. This avoids data being wrongly flagged as missing when the respondent never saw that question. 
 
-```{r item_missing, fig.width = 12, fig.height = 12}
-## will likely need updating based on real data
+```{r item_missing}
+source('4_missing_table.R')
+# make single cell
+missing_table = mutate(missing_table,
+                       cell = paste(missing, ' (', percent, ')', sep='')) %>%
+  select(labels, n, cell) %>%
+  rename('Question' = 'labels',
+         'Max response' = 'n',
+         'Missing, n (%)' = 'cell')
 
-# make question completion patterns
-mdata = mutate(data, 
-              ## simplify some variables for missing plot
-              # any answer to q3
-              q3 = !is.na(q3_1)+!is.na(q3_2)+!is.na(q3_3)+!is.na(q3_4)+!is.na(q3_5)+
-                !is.na(q3_6)+!is.na(q3_7)+!is.na(q3_8)+!is.na(q3_9) > 0,
-              # any answer to q6 or q7 (options 1 and 2)
-              q6_7 = !is.na(q6_1_1)+(!is.na(q7)*!is.na(q8_1_1)) > 0,
-              # any answer to q10
-              q10 = !is.na(q10_1)+!is.na(q10_2)+!is.na(q10_3)+!is.na(q10_4)+
-                !is.na(q10_5)+!is.na(q10_6)+!is.na(q10_7)+!is.na(q10_8)+
-                !is.na(q10_9) > 0,
-              # any answer to q15
-              q15 = !is.na(q15_1)+!is.na(q15_2)+!is.na(q15_3)+!is.na(q15_4)+
-                !is.na(q15_5)+!is.na(q15_6) > 0,
-              # patterns based on question logic
-              q10_11_21_22_complete = ifelse(q9_1 == 'Yes' | q9_2 == 'Yes', 'q10', ''),
-              q12_complete = ifelse(q9_2 == 'Yes', 'q12', ''),
-              q13_to_16_complete = ifelse(q9_1 == 'No', 'q13', ''),
-              q18_complete = ifelse(q16 == 'No', 'q18', ''),
-              q20_complete = ifelse(q16 == 'No', 'q20', '')) %>%
-  unite("pattern", all_of(contains('_complete')), remove = FALSE) # combine to make the overall pattern
-# questions that everyone should complete:
-base_q = c('q3','q4','q6_7','q9_1','q9_2') 
-# create variable lists dependent on patterns
-patterns = unique(mdata$pattern)
-# separate plot for each missing data pattern
-plots = list()
-for (k in 1:length(patterns)){
-  # add variables to plot depending on questionnaire logic
-  vars_to_include = base_q
-  if(str_detect(patterns[k], 'q10')){vars_to_include = c(vars_to_include, 'q10','q11','q21','q22')} 
-  if(str_detect(patterns[k], 'q12')){vars_to_include = c(vars_to_include, 'q12')} #
-  if(str_detect(patterns[k], 'q13')){vars_to_include = c(vars_to_include, 'q13','q14','q15','q16')} #
-  if(str_detect(patterns[k], 'q18')){vars_to_include = c(vars_to_include, 'q18')} #
-  if(str_detect(patterns[k], 'q20')){vars_to_include = c(vars_to_include, 'q21', 'q22')} #
-  # select data
-  this_data = select(mdata, 'pattern', all_of(vars_to_include)) %>%
-    filter(pattern == patterns[k]) %>% 
-    select(-pattern)
-  plots[[k]] = vis_miss(this_data) + ggtitle(patterns[k])
-}
-grid.arrange(grobs=plots)
+#
+ftab = flextable(missing_table) %>%
+  theme_box() %>%
+  width(j=1, width = 12, unit = 'cm')
+ftab
+# output to latex
+print(xtable(missing_table, caption = 'Number and percentage of item-missing questions', label='tab:item_missing'), 
+      include.rownames = FALSE, 
+      table.placement = '!h',
+      file='latex/table_item_missing.tex')
 ```
+
